@@ -7,7 +7,7 @@ import { Request } from 'express';
 interface AuthenticatedUser {
   userId: string;
   email: string;
-  role: string;
+  role: UserRole;
 }
 
 @Injectable()
@@ -27,6 +27,6 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const user = request.user as AuthenticatedUser;
 
-    return requiredRoles.some((role) => user.role === (role as string));
+    return requiredRoles.some((role) => user.role === role);
   }
 }
