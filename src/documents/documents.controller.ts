@@ -1,4 +1,127 @@
-import { Controller } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  Body,
+  Request,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  Param,
+  Res,
+  Get,
+  Query,
+  Delete,
+  Patch,
+  BadRequestException,
+} from '@nestjs/common';
+import { DocumentsService } from './documents.service';
+import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { UploadDocumentDto } from './dto/upload-document.dto';
+import type { Response } from 'express';
+import { Request as ExpressRequest } from 'express';
+import { GetDocumentsQueryDto } from './dto/get-documents-query.dto';
+import { UpdateDocumentDto } from './dto/update-document.dto';
+import { Types } from 'mongoose';
 
+interface AuthenticatedRequest extends ExpressRequest {
+  user: { userId: string; email: string; role: string };
+}
+
+@UseGuards(AuthGuard('jwt'))
 @Controller('documents')
-export class DocumentsController {}
+export class DocumentsController {
+  constructor(private readonly documentsService: DocumentsService) {}
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadDocument(
+    @Request() req: AuthenticatedRequest,
+    @Body() uploadDocumentDto: UploadDocumentDto,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 })],
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    const uploaderId = req.user.userId;
+    return this.documentsService.create(uploadDocumentDto, file, uploaderId);
+  }
+
+  @Get(':id/download')
+  async downloadDocument(
+    @Param('id') docId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { streamableFile, doc } = await this.documentsService.download(docId);
+    const originalFilename = doc.fileUrl.split('/').pop();
+
+    res.set({
+      'Content-Type': doc.fileType,
+      'Content-Disposition': `attachment; filename="${originalFilename}"`,
+    });
+
+    return streamableFile;
+  }
+
+  @Get()
+  findAll(@Query() query: Record<string, string | string[]>) {
+    const dto = new GetDocumentsQueryDto();
+
+    Object.assign(dto, query);
+
+    if (query['subjects[]']) {
+      const raw = query['subjects[]'];
+      dto.subjects = Array.isArray(raw) ? raw : [raw];
+    } else if (query['subjects']) {
+      const raw = query['subjects'];
+      dto.subjects = Array.isArray(raw) ? raw : [raw];
+    }
+
+    return this.documentsService.findAll(dto);
+  }
+
+  @Get('my-uploads')
+  getMyUploads(
+    @Request() req: AuthenticatedRequest,
+    @Query() queryDto: GetDocumentsQueryDto,
+  ) {
+    const userId = req.user.userId;
+    return this.documentsService.findMyDocuments(userId, queryDto);
+  }
+
+  @Get('user/:userId/uploads')
+  getUserUploads(
+    @Param('userId') userId: string,
+    @Query() queryDto: GetDocumentsQueryDto,
+  ) {
+    return this.documentsService.findUserDocuments(userId, queryDto);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') docId: string) {
+    if (!Types.ObjectId.isValid(docId)) {
+      throw new BadRequestException('Invalid document ID format');
+    }
+    return this.documentsService.findOne(docId);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id') docId: string,
+    @Body() updateDocumentDto: UpdateDocumentDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user.userId;
+    return this.documentsService.update(docId, updateDocumentDto, userId);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') docId: string, @Request() req: AuthenticatedRequest) {
+    const userId = req.user.userId;
+    return this.documentsService.remove(docId, userId);
+  }
+}

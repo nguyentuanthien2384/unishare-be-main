@@ -13,6 +13,9 @@ export class PlatformStats extends Document {
   totalDocuments: number;
 
   @Prop({ default: 0 })
+  totalUploads: number;
+
+  @Prop({ default: 0 })
   totalDownloads: number;
 }
 

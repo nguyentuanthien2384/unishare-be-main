@@ -1,8 +1,8 @@
 // src/documents/schemas/document.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import * as mongoose from 'mongoose';
-import { User } from 'src/users/schemas/user.schema';
-import { Subject } from 'src/subjects/schemas/subject.schema';
+import { User } from '../../users/schemas/user.schema';
+import { Subject } from '../../subjects/schemas/subject.schema';
 
 export enum DocumentStatus {
   PROCESSING = 'PROCESSING', // Đang chờ (ví dụ: quét virus, nén)
