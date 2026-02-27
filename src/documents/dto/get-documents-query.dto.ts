@@ -27,12 +27,11 @@ export class GetDocumentsQueryDto {
 
   @IsOptional()
   @IsString()
-  subject?: string; // Trường cũ giữ nguyên
+  subject?: string;
 
-  // ✅ subjects sẽ được xử lý ở Controller level
-  // Không cần Transform phức tạp
   @IsOptional()
   @IsArray()
+  @IsString({ each: true })
   subjects?: string[];
 
   @IsOptional()

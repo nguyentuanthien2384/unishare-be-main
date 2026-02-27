@@ -8,11 +8,11 @@ import {
 
 export class CreateMajorDto {
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Tên ngành học không được để trống' })
   name: string;
 
   @IsArray()
-  @IsMongoId({ each: true }) // Đảm bảo mỗi phần tử là một MongoID
+  @IsMongoId({ each: true, message: 'Mỗi subject phải là MongoID hợp lệ' })
   @IsOptional()
-  subjects?: string[]; // Mảng các ID của môn học
+  subjects?: string[];
 }

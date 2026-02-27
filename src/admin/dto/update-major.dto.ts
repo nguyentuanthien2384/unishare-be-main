@@ -7,6 +7,6 @@ export class UpdateMajorDto {
 
   @IsOptional()
   @IsArray()
-  @IsMongoId({ each: true })
+  @IsMongoId({ each: true, message: 'Mỗi subject phải là MongoID hợp lệ' })
   subjects?: string[];
 }

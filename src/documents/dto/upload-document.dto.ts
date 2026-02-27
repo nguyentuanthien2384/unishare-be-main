@@ -1,4 +1,3 @@
-// src/documents/dto/upload-document.dto.ts
 import {
   IsString,
   IsNotEmpty,
@@ -9,15 +8,15 @@ import {
 
 export class UploadDocumentDto {
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Tiêu đề không được để trống' })
   title: string;
 
   @IsString()
   @IsOptional()
   description?: string;
 
-  @IsMongoId() // Đảm bảo đây là một ID của MongoDB
-  @IsNotEmpty()
+  @IsMongoId({ message: 'Subject ID không hợp lệ' })
+  @IsNotEmpty({ message: 'Môn học không được để trống' })
   subject: string;
 
   @IsString()

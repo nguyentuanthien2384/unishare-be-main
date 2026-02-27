@@ -2,14 +2,14 @@ import { IsString, IsNotEmpty } from 'class-validator';
 
 export class CreateSubjectDto {
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Tên môn học không được để trống' })
   name: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Mã môn học không được để trống' })
   code: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Khoa quản lý không được để trống' })
   managingFaculty: string;
 }

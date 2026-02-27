@@ -1,98 +1,210 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# UniShare Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend API cho ứng dụng chia sẻ tài liệu học tập UniShare, xây dựng bằng NestJS + MongoDB.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Yêu cầu hệ thống
 
-## Description
+- **Node.js** >= 18
+- **MongoDB** >= 6.0 (local hoặc Atlas)
+- **npm** >= 9
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
+## Cài đặt
 
 ```bash
-$ npm install
+# 1. Clone repository
+git clone <repo-url>
+cd UniShare-BE-main
+
+# 2. Cài dependencies
+npm install
+
+# 3. Tạo file .env
+cp .env.example .env
 ```
 
-## Compile and run the project
+## Cấu hình (.env)
+
+Tạo file `.env` ở thư mục gốc với nội dung:
+
+```env
+PORT=8000
+DATABASE_URL=mongodb://127.0.0.1:27017/unishare
+JWT_SECRET=your_jwt_secret_key_here
+API_URL=http://localhost:8000
+```
+
+## Chạy ứng dụng
 
 ```bash
-# development
-$ npm run start
+# Development (auto-reload)
+npm run start:dev
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+# Production
+npm run build
+npm run start:prod
 ```
 
-## Run tests
+Server chạy tại: `http://localhost:8000`
+API prefix: `/api`
+
+## Seed dữ liệu
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# Tạo tài khoản Admin mặc định
+npm run seed:admin
 ```
 
-## Deployment
+Thông tin admin mặc định:
+- Email: `admin@unishare.com`
+- Password: `admin123`
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Cấu trúc thư mục
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+```
+src/
+├── auth/           # Đăng ký, đăng nhập, JWT strategy
+├── users/          # Quản lý profile, đổi mật khẩu
+├── documents/      # Upload, download, CRUD tài liệu
+├── categories/     # API công khai lấy danh sách môn/ngành
+├── admin/          # CRUD users, documents, subjects, majors (Admin/Mod)
+├── statistics/     # Thống kê nền tảng
+├── logs/           # Ghi log hoạt động admin
+├── subjects/       # Schema môn học
+├── majors/         # Schema ngành học
+├── app.module.ts   # Root module
+├── main.ts         # Entry point
+└── create-admin.ts # Script seed admin
+```
+
+## API Endpoints
+
+### Auth (`/api/auth`)
+| Method | Endpoint    | Mô tả           | Auth |
+|--------|-------------|------------------|------|
+| POST   | /register   | Đăng ký          | No   |
+| POST   | /login      | Đăng nhập        | No   |
+| GET    | /me         | Lấy profile      | JWT  |
+
+### Users (`/api/users`)
+| Method | Endpoint          | Mô tả                  | Auth |
+|--------|-------------------|-------------------------|------|
+| GET    | /me/profile       | Profile của mình        | JWT  |
+| PATCH  | /me/profile       | Cập nhật profile        | JWT  |
+| POST   | /me/change-password | Đổi mật khẩu          | JWT  |
+| GET    | /me/stats         | Thống kê của mình       | JWT  |
+| GET    | /profile/:userId  | Profile user khác       | JWT  |
+| GET    | /:userId/stats    | Thống kê user khác      | JWT  |
+
+### Documents (`/api/documents`)
+| Method | Endpoint            | Mô tả                  | Auth |
+|--------|---------------------|-------------------------|------|
+| POST   | /upload             | Upload tài liệu        | JWT  |
+| GET    | /                   | Danh sách tài liệu     | JWT  |
+| GET    | /my-uploads         | Tài liệu của mình      | JWT  |
+| GET    | /user/:userId/uploads | Tài liệu của user khác | JWT |
+| GET    | /:id                | Chi tiết tài liệu      | JWT  |
+| GET    | /:id/download       | Download tài liệu      | JWT  |
+| PATCH  | /:id                | Cập nhật tài liệu      | JWT  |
+| DELETE | /:id                | Xóa tài liệu           | JWT  |
+
+### Categories (`/api/categories`)
+| Method | Endpoint      | Mô tả               | Auth |
+|--------|---------------|----------------------|------|
+| GET    | /subjects     | Danh sách môn học    | JWT  |
+| GET    | /majors       | Danh sách ngành học  | JWT  |
+| GET    | /majors/:id   | Chi tiết ngành học   | JWT  |
+
+### Admin (`/api/admin`) - Yêu cầu role ADMIN hoặc MODERATOR
+| Method | Endpoint                   | Mô tả              | Role          |
+|--------|----------------------------|---------------------|---------------|
+| GET    | /users                     | Danh sách users     | Admin, Mod    |
+| PATCH  | /users/:id/role            | Đổi role user       | Admin         |
+| POST   | /users/:id/reset-password  | Reset mật khẩu      | Admin, Mod    |
+| POST   | /users/:id/block           | Block user          | Admin, Mod    |
+| POST   | /users/:id/unblock         | Unblock user        | Admin, Mod    |
+| DELETE | /users/:id                 | Xóa user            | Admin         |
+| GET    | /documents                 | Danh sách documents | Admin, Mod    |
+| POST   | /documents/:id/block       | Block document      | Admin, Mod    |
+| POST   | /documents/:id/unblock     | Unblock document    | Admin, Mod    |
+| DELETE | /documents/:id             | Xóa document        | Admin         |
+| POST   | /subjects                  | Tạo môn học         | Admin, Mod    |
+| GET    | /subjects                  | Danh sách môn học   | Admin, Mod    |
+| PATCH  | /subjects/:id              | Cập nhật môn học    | Admin, Mod    |
+| DELETE | /subjects/:id              | Xóa môn học         | Admin, Mod    |
+| POST   | /majors                    | Tạo ngành học       | Admin, Mod    |
+| GET    | /majors                    | Danh sách ngành học | Admin, Mod    |
+| PATCH  | /majors/:id                | Cập nhật ngành học  | Admin, Mod    |
+| DELETE | /majors/:id                | Xóa ngành học       | Admin, Mod    |
+
+### Statistics (`/api/statistics`) - Admin/Mod only
+| Method | Endpoint          | Mô tả                    | Role       |
+|--------|-------------------|---------------------------|------------|
+| GET    | /platform         | Thống kê nền tảng         | Admin, Mod |
+| GET    | /uploads-over-time | Biểu đồ upload theo ngày | Admin, Mod |
+
+### Logs (`/api/logs`) - Admin only
+| Method | Endpoint | Mô tả          | Role  |
+|--------|----------|-----------------|-------|
+| GET    | /        | Danh sách logs  | Admin |
+
+## Test thủ công (Flow đầy đủ)
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# 1. Seed admin
+npm run seed:admin
+
+# 2. Chạy server
+npm run start:dev
+
+# 3. Đăng ký user mới
+curl -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@test.com","fullName":"Test User","password":"123456"}'
+
+# 4. Đăng nhập
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@test.com","password":"123456"}'
+# → Lấy accessToken từ response
+
+# 5. Upload tài liệu (thay TOKEN bằng accessToken)
+curl -X POST http://localhost:8000/api/documents/upload \
+  -H "Authorization: Bearer TOKEN" \
+  -F "title=Bài giảng" \
+  -F "subject=SUBJECT_ID" \
+  -F "file=@/path/to/file.pdf"
+
+# 6. Xem danh sách tài liệu
+curl http://localhost:8000/api/documents \
+  -H "Authorization: Bearer TOKEN"
+
+# 7. Đăng nhập admin
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@unishare.com","password":"admin123"}'
+
+# 8. Xem thống kê (dùng admin token)
+curl http://localhost:8000/api/statistics/platform \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+
+# 9. Xem logs
+curl http://localhost:8000/api/logs \
+  -H "Authorization: Bearer ADMIN_TOKEN"
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Validation
 
-## Resources
+- `whitelist: true` — Tự động loại bỏ các field không khai báo trong DTO
+- `forbidNonWhitelisted: true` — Trả lỗi nếu gửi field thừa
+- `transform: true` — Tự động convert type (string → number cho query params)
 
-Check out a few resources that may come in handy when working with NestJS:
+## Scripts
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+| Script | Mô tả |
+|--------|-------|
+| `npm run start:dev` | Chạy development mode (auto-reload) |
+| `npm run build` | Build production |
+| `npm run start:prod` | Chạy production |
+| `npm run seed:admin` | Tạo tài khoản admin mặc định |
+| `npm run lint` | Kiểm tra và fix lỗi ESLint |
+| `npm run format` | Format code với Prettier |

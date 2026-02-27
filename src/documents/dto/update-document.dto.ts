@@ -1,5 +1,4 @@
-// src/documents/dto/update-document.dto.ts
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsMongoId } from 'class-validator';
 
 export class UpdateDocumentDto {
   @IsString()
@@ -10,7 +9,7 @@ export class UpdateDocumentDto {
   @IsOptional()
   description?: string;
 
-  @IsString()
+  @IsMongoId({ message: 'Subject ID không hợp lệ' })
   @IsOptional()
   subject?: string;
 

@@ -10,10 +10,17 @@ async function bootstrap() {
     exposedHeaders: ['Content-Disposition'],
   });
 
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
 
   app.setGlobalPrefix('api');
 
   await app.listen(process.env.PORT ?? 8000);
 }
-bootstrap();
+void bootstrap();
