@@ -6,11 +6,15 @@ import {
   PlatformStats,
   PlatformStatsSchema,
 } from './schemas/platform-stats.schema';
+import { Document, DocumentSchema } from '../documents/schemas/document.schema';
+import { User, UserSchema } from '../users/schemas/user.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: PlatformStats.name, schema: PlatformStatsSchema },
+      { name: Document.name, schema: DocumentSchema },
+      { name: User.name, schema: UserSchema },
     ]),
   ],
   controllers: [StatisticsController],
