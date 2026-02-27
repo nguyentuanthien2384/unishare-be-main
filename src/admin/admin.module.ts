@@ -1,8 +1,29 @@
 import { Module } from '@nestjs/common';
-import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { AdminController } from './admin.controller';
+import { UsersModule } from '../users/users.module';
+import { DocumentsModule } from '../documents/documents.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { User, UserSchema } from '../users/schemas/user.schema';
+import { Document, DocumentSchema } from '../documents/schemas/document.schema';
+import { Subject, SubjectSchema } from '../subjects/schemas/subject.schema';
+import { Major, MajorSchema } from '../majors/schemas/major.schema';
+import { LogsModule } from '../logs/logs.module';
+import { StatisticsModule } from '../statistics/statistics.module';
 
 @Module({
+  imports: [
+    UsersModule,
+    DocumentsModule,
+    LogsModule,
+    StatisticsModule,
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: Document.name, schema: DocumentSchema },
+      { name: Subject.name, schema: SubjectSchema },
+      { name: Major.name, schema: MajorSchema },
+    ]),
+  ],
   controllers: [AdminController],
   providers: [AdminService],
 })
