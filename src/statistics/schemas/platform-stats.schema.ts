@@ -1,8 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { HydratedDocument } from 'mongoose';
+
+export type PlatformStatsDocument = HydratedDocument<PlatformStats>;
 
 @Schema()
-export class PlatformStats extends Document {
+export class PlatformStats {
   @Prop({ default: 0 })
   totalUploads: number;
 
@@ -13,5 +15,4 @@ export class PlatformStats extends Document {
   activeUsers: number;
 }
 
-export const PlatformStatsSchema =
-  SchemaFactory.createForClass(PlatformStats);
+export const PlatformStatsSchema = SchemaFactory.createForClass(PlatformStats);
