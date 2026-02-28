@@ -6,26 +6,12 @@ dotenv.config();
 
 const UserSchema = new mongoose.Schema(
   {
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-      lowercase: true,
-    },
+    email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     password: { type: String, required: true },
     fullName: { type: String, required: true },
     avatarUrl: { type: String, default: null },
-    role: {
-      type: String,
-      enum: ['USER', 'MODERATOR', 'ADMIN'],
-      default: 'USER',
-    },
-    status: {
-      type: String,
-      enum: ['ACTIVE', 'BLOCKED'],
-      default: 'ACTIVE',
-    },
+    role: { type: String, enum: ['USER', 'MODERATOR', 'ADMIN'], default: 'USER' },
+    status: { type: String, enum: ['ACTIVE', 'BLOCKED'], default: 'ACTIVE' },
     uploadsCount: { type: Number, default: 0 },
     downloadsCount: { type: Number, default: 0 },
   },
@@ -61,7 +47,6 @@ async function createAdmin() {
     password: hashedPassword,
     fullName: 'System Admin',
     role: 'ADMIN',
-    status: 'ACTIVE',
   });
 
   console.log('Admin account created successfully!');

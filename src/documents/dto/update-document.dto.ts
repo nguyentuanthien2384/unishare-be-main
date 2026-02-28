@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsMongoId } from 'class-validator';
+import { IsString, IsOptional, IsMongoId } from 'class-validator';
 
 export class UpdateDocumentDto {
   @IsString()
@@ -20,13 +20,4 @@ export class UpdateDocumentDto {
   @IsString()
   @IsOptional()
   schoolYear?: string;
-
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  tags?: string[];
-
-  @IsString()
-  @IsOptional()
-  faculty?: string;
 }

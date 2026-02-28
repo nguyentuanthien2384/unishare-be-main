@@ -9,7 +9,7 @@ import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { StatisticsService } from '../statistics/statistics.service';
-import { User } from '../users/schemas/user.schema';
+import { User, UserStatus } from '../users/schemas/user.schema';
 
 @Injectable()
 export class AuthService {
@@ -50,6 +50,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (user.status === UserStatus.BLOCKED) {
+      throw new UnauthorizedException(
+        'Tài khoản đã bị khóa. Liên hệ quản trị viên.',
+      );
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       throw new UnauthorizedException('Invalid credentials');
@@ -61,10 +67,15 @@ export class AuthService {
     return {
       accessToken,
       user: {
-        id: user._id,
+        _id: user._id,
         email: user.email,
         fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
         role: user.role,
+        status: user.status,
+        joinedDate: (user as unknown as Record<string, unknown>).joinedDate,
+        uploadsCount: user.uploadsCount,
+        downloadsCount: user.downloadsCount,
       },
     };
   }

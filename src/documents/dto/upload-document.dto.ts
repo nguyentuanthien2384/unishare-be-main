@@ -2,7 +2,6 @@ import {
   IsString,
   IsNotEmpty,
   IsOptional,
-  IsArray,
   IsMongoId,
 } from 'class-validator';
 
@@ -26,13 +25,4 @@ export class UploadDocumentDto {
   @IsString()
   @IsOptional()
   schoolYear?: string;
-
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  tags?: string[];
-
-  @IsString()
-  @IsOptional()
-  faculty?: string;
 }

@@ -43,6 +43,18 @@ export class AdminService {
     return user;
   }
 
+  async blockUser(userId: string, actorId: string): Promise<User> {
+    await this.logsService.createLog(actorId, 'BLOCK_USER', userId);
+    await this.statisticsService.incrementActiveUsers(-1);
+    return this.updateUserStatus(userId, UserStatus.BLOCKED);
+  }
+
+  async unblockUser(userId: string, actorId: string): Promise<User> {
+    await this.logsService.createLog(actorId, 'UNBLOCK_USER', userId);
+    await this.statisticsService.incrementActiveUsers(1);
+    return this.updateUserStatus(userId, UserStatus.ACTIVE);
+  }
+
   async blockDocument(docId: string): Promise<Document> {
     return this.updateDocumentStatus(docId, DocumentStatus.BLOCKED);
   }
@@ -67,7 +79,6 @@ export class AdminService {
   async deleteUser(userId: string): Promise<{ message: string }> {
     const user = await this.userModel.findByIdAndDelete(userId);
     if (!user) throw new NotFoundException('User not found');
-
     await this.statisticsService.incrementActiveUsers(-1);
     return { message: 'User deleted successfully' };
   }
@@ -75,7 +86,6 @@ export class AdminService {
   async deleteDocument(docId: string): Promise<{ message: string }> {
     const doc = await this.documentModel.findByIdAndDelete(docId);
     if (!doc) throw new NotFoundException('Document not found');
-
     await this.statisticsService.incrementTotalUploads(-1);
     return { message: 'Document deleted successfully' };
   }
@@ -108,9 +118,7 @@ export class AdminService {
       ];
     }
 
-    if (role) {
-      query.role = role;
-    }
+    if (role) query.role = role;
 
     const sortOptions: Record<string, 1 | -1> = {};
     sortOptions[sortBy] = sortBy === 'joinedDate' ? -1 : 1;
@@ -191,18 +199,6 @@ export class AdminService {
     return { message: 'Subject deleted successfully' };
   }
 
-  async blockUser(userId: string, actorId: string): Promise<User> {
-    await this.logsService.createLog(actorId, 'BLOCK_USER', userId);
-    await this.statisticsService.incrementActiveUsers(-1);
-    return this.updateUserStatus(userId, UserStatus.BLOCKED);
-  }
-
-  async unblockUser(userId: string, actorId: string): Promise<User> {
-    await this.logsService.createLog(actorId, 'UNBLOCK_USER', userId);
-    await this.statisticsService.incrementActiveUsers(1);
-    return this.updateUserStatus(userId, UserStatus.ACTIVE);
-  }
-
   async createMajor(createMajorDto: CreateMajorDto) {
     const existing = await this.majorModel.findOne({
       name: createMajorDto.name,
@@ -217,15 +213,17 @@ export class AdminService {
   async findAllMajors() {
     return this.majorModel
       .find()
-      .populate('subjects', 'name code')
+      .populate('subjects', 'name code managingFaculty')
       .sort({ name: 1 })
       .exec();
   }
 
   async updateMajor(id: string, updateMajorDto: UpdateMajorDto) {
-    const major = await this.majorModel.findByIdAndUpdate(id, updateMajorDto, {
-      new: true,
-    });
+    const major = await this.majorModel.findByIdAndUpdate(
+      id,
+      updateMajorDto,
+      { new: true },
+    );
     if (!major) throw new NotFoundException('Major not found');
     return major;
   }
@@ -251,7 +249,8 @@ export class AdminService {
       query.$or = [{ title: { $regex: search, $options: 'i' } }];
     }
 
-    const sortField = sortBy === 'downloads' ? 'downloadCount' : 'uploadDate';
+    const sortField =
+      sortBy === 'downloads' ? 'downloadCount' : 'uploadDate';
     const sortOrderValue = sortOrder === 'asc' ? 1 : -1;
     const sortOptions: Record<string, 1 | -1> = {
       [sortField]: sortOrderValue,

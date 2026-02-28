@@ -30,11 +30,11 @@ interface AuthenticatedRequest extends ExpressRequest {
   user: { userId: string; email: string; role: string };
 }
 
-@UseGuards(AuthGuard('jwt'))
 @Controller('documents')
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
+  @UseGuards(AuthGuard('jwt'))
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   uploadDocument(
@@ -51,12 +51,14 @@ export class DocumentsController {
     return this.documentsService.create(uploadDocumentDto, file, uploaderId);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Get(':id/download')
   async downloadDocument(
     @Param('id') docId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { streamableFile, doc } = await this.documentsService.download(docId);
+    const { streamableFile, doc } =
+      await this.documentsService.download(docId);
     const originalFilename = doc.fileUrl.split('/').pop();
 
     res.set({
@@ -70,7 +72,6 @@ export class DocumentsController {
   @Get()
   findAll(@Query() query: Record<string, string | string[]>) {
     const dto = new GetDocumentsQueryDto();
-
     Object.assign(dto, query);
 
     if (query['subjects[]']) {
@@ -84,6 +85,7 @@ export class DocumentsController {
     return this.documentsService.findAll(dto);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Get('my-uploads')
   getMyUploads(
     @Request() req: AuthenticatedRequest,
@@ -109,6 +111,7 @@ export class DocumentsController {
     return this.documentsService.findOne(docId);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Patch(':id')
   update(
     @Param('id') docId: string,
@@ -119,6 +122,7 @@ export class DocumentsController {
     return this.documentsService.update(docId, updateDocumentDto, userId);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Delete(':id')
   remove(@Param('id') docId: string, @Request() req: AuthenticatedRequest) {
     const userId = req.user.userId;

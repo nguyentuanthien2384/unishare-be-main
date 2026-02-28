@@ -1,8 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
-export const GLOBAL_STATS_ID = 'GLOBAL_STATS';
-
 @Schema()
 export class PlatformStats extends Document {
   @Prop({ default: 0 })
@@ -15,4 +13,5 @@ export class PlatformStats extends Document {
   activeUsers: number;
 }
 
-export const PlatformStatsSchema = SchemaFactory.createForClass(PlatformStats);
+export const PlatformStatsSchema =
+  SchemaFactory.createForClass(PlatformStats);

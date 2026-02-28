@@ -43,7 +43,6 @@ export class DocumentsService {
       fileType: file.mimetype,
       fileSize: file.size,
       uploader: uploaderId,
-      tags: uploadDocumentDto.tags || [],
     });
 
     const savedDocument = await documentData.save();
@@ -67,7 +66,11 @@ export class DocumentsService {
       throw new NotFoundException('Document not found');
     }
 
-    const localFilePath = join(process.cwd(), doc.filePath);
+    const localFilePath = join(
+      process.cwd(),
+      (doc as unknown as Record<string, string>).filePath ||
+        doc.fileUrl.replace(/^https?:\/\/[^/]+\//, ''),
+    );
     try {
       const file = createReadStream(localFilePath);
 
@@ -83,8 +86,7 @@ export class DocumentsService {
         streamableFile: new StreamableFile(file),
         doc,
       };
-    } catch (error) {
-      console.error(error);
+    } catch {
       throw new NotFoundException('File not found on server storage.');
     }
   }
@@ -120,7 +122,8 @@ export class DocumentsService {
       query.documentType = documentType;
     }
 
-    const sortField = sortBy === 'downloads' ? 'downloadCount' : sortBy;
+    const sortField =
+      sortBy === 'downloads' ? 'downloadCount' : sortBy;
     const sortOrderValue = sortOrder === 'asc' ? 1 : -1;
     const sortOptions: Record<string, 1 | -1> = {
       [sortField]: sortOrderValue,
@@ -131,7 +134,7 @@ export class DocumentsService {
     const [documents, totalDocuments] = await Promise.all([
       this.documentModel
         .find(query)
-        .populate('uploader', 'fullName')
+        .populate('uploader', 'fullName avatarUrl')
         .populate('subject', 'name code')
         .sort(sortOptions)
         .skip(skip)
@@ -212,7 +215,6 @@ export class DocumentsService {
 
     await this.usersService.incrementUploadCount(userId, -1);
     await this.statisticsService.incrementTotalUploads(-1);
-
     await this.logsService.createLog(userId, 'DELETE_OWN_DOCUMENT', docId);
 
     return { message: 'Document deleted successfully' };
@@ -233,7 +235,8 @@ export class DocumentsService {
 
     if (search) query.title = { $regex: search, $options: 'i' };
 
-    const sortField = sortBy === 'downloads' ? 'downloadCount' : 'uploadDate';
+    const sortField =
+      sortBy === 'downloads' ? 'downloadCount' : 'uploadDate';
     const sortOrderValue = sortOrder === 'asc' ? 1 : -1;
     const sortOptions: Record<string, 1 | -1> = {
       [sortField]: sortOrderValue,
@@ -278,7 +281,8 @@ export class DocumentsService {
 
     if (search) query.title = { $regex: search, $options: 'i' };
 
-    const sortField = sortBy === 'downloads' ? 'downloadCount' : 'uploadDate';
+    const sortField =
+      sortBy === 'downloads' ? 'downloadCount' : 'uploadDate';
     const sortOrderValue = sortOrder === 'asc' ? 1 : -1;
     const sortOptions: Record<string, 1 | -1> = {
       [sortField]: sortOrderValue,

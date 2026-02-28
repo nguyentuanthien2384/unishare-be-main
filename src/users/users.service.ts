@@ -1,4 +1,3 @@
-// src/users/users.service.ts
 import {
   Injectable,
   NotFoundException,
@@ -26,7 +25,7 @@ export class UsersService {
   }
 
   async findById(id: string): Promise<User> {
-    const user = await this.userModel.findById(id).select('-password'); // Loại bỏ password
+    const user = await this.userModel.findById(id).select('-password');
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -37,7 +36,6 @@ export class UsersService {
     userId: string,
     updateProfileDto: UpdateUserDto,
   ): Promise<User> {
-    // DTO này giờ có thể chứa fullName hoặc avatarUrl
     const updatedUser = await this.userModel
       .findByIdAndUpdate(userId, updateProfileDto, { new: true })
       .select('-password');
@@ -48,7 +46,6 @@ export class UsersService {
     return updatedUser;
   }
 
-  // --- THÊM HÀM MỚI ---
   async changePassword(
     userId: string,
     changePasswordDto: ChangePasswordDto,
@@ -58,7 +55,6 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    // 1. Kiểm tra mật khẩu cũ
     const isMatch = await bcrypt.compare(
       changePasswordDto.oldPassword,
       user.password,
@@ -67,7 +63,6 @@ export class UsersService {
       throw new UnauthorizedException('Mật khẩu cũ không chính xác');
     }
 
-    // 2. Hash và lưu mật khẩu mới
     user.password = await bcrypt.hash(changePasswordDto.newPassword, 10);
     await user.save();
 
@@ -77,7 +72,6 @@ export class UsersService {
       .exec() as Promise<User>;
   }
 
-  // Cập nhật R1.6.2: Cho phép tăng hoặc giảm
   async incrementUploadCount(userId: string, amount: number = 1) {
     await this.userModel.updateOne(
       { _id: userId },
@@ -85,7 +79,6 @@ export class UsersService {
     );
   }
 
-  // Cập nhật R1.6.1: Cho phép tăng hoặc giảm
   async incrementTotalDownloads(userId: string, amount: number = 1) {
     await this.userModel.updateOne(
       { _id: userId },
@@ -93,18 +86,16 @@ export class UsersService {
     );
   }
 
-  // Lấy thống kê cho trang profile (image_e95cc0.png)
   async getMyStats(userId: string) {
     const userStats = await this.userModel
       .findById(userId)
       .select('uploadsCount downloadsCount')
-      .lean(); // .lean() để trả về object JS thuần
+      .lean();
 
     if (!userStats) {
       throw new NotFoundException('User not found');
     }
 
-    // Tính Avg Downloads/Doc
     const avgDownloads =
       userStats.uploadsCount > 0
         ? userStats.downloadsCount / userStats.uploadsCount

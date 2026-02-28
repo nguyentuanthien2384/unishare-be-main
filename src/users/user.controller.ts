@@ -1,4 +1,3 @@
-// src/users/users.controller.ts
 import {
   Controller,
   Get,
@@ -37,7 +36,10 @@ export class UsersController {
     @Request() req: AuthenticatedRequest,
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
-    return this.usersService.changePassword(req.user.userId, changePasswordDto);
+    return this.usersService.changePassword(
+      req.user.userId,
+      changePasswordDto,
+    );
   }
 
   @Get('profile/:userId')

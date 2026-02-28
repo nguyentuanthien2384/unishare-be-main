@@ -15,18 +15,6 @@ export class GetDocumentsQueryDto {
 
   @IsOptional()
   @IsString()
-  faculty?: string;
-
-  @IsOptional()
-  @IsIn(['uploadDate', 'downloads'])
-  sortBy?: string = 'uploadDate';
-
-  @IsOptional()
-  @IsIn(['asc', 'desc'])
-  sortOrder?: string = 'desc';
-
-  @IsOptional()
-  @IsString()
   subject?: string;
 
   @IsOptional()
@@ -37,6 +25,14 @@ export class GetDocumentsQueryDto {
   @IsOptional()
   @IsString()
   documentType?: string;
+
+  @IsOptional()
+  @IsIn(['uploadDate', 'downloadCount'])
+  sortBy?: string = 'uploadDate';
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortOrder?: string = 'desc';
 
   @IsOptional()
   @Type(() => Number)

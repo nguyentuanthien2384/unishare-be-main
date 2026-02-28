@@ -43,7 +43,10 @@ export class AdminController {
 
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @Post('users/:id/block')
-  blockUser(@Param('id') userId: string, @Request() req: AuthenticatedRequest) {
+  blockUser(
+    @Param('id') userId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
     return this.adminService.blockUser(userId, req.user.userId);
   }
 
@@ -139,7 +142,10 @@ export class AdminController {
 
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @Patch('majors/:id')
-  updateMajor(@Param('id') id: string, @Body() updateMajorDto: UpdateMajorDto) {
+  updateMajor(
+    @Param('id') id: string,
+    @Body() updateMajorDto: UpdateMajorDto,
+  ) {
     return this.adminService.updateMajor(id, updateMajorDto);
   }
 

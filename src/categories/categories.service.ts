@@ -1,5 +1,3 @@
-// src/categories/categories.service.ts hoặc tương tự
-
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -13,47 +11,21 @@ export class CategoriesService {
     @InjectModel(Subject.name) private subjectModel: Model<Subject>,
   ) {}
 
-  // ✅ Lấy tất cả majors với subjects đầy đủ
   async getAllMajors() {
-    const majors = await this.majorModel
+    return this.majorModel
       .find()
-      .populate('subjects', '_id name code') // ✅ ĐẢM BẢO POPULATE subjects
+      .populate('subjects', '_id name code managingFaculty')
       .exec();
-
-    console.log('✅ [CategoriesService] getAllMajors result:');
-    majors.forEach((m) => {
-      console.log(
-        `  - ${m.name}: ${m.subjects?.length || 0} subjects`,
-        m.subjects?.map((s) => (s as unknown as { name: string }).name),
-      );
-    });
-
-    return majors;
   }
 
-  // ✅ Lấy major cụ thể với subjects
   async getMajorById(id: string) {
-    const major = await this.majorModel
+    return this.majorModel
       .findById(id)
-      .populate('subjects', '_id name code')
+      .populate('subjects', '_id name code managingFaculty')
       .exec();
-
-    if (major) {
-      console.log(`✅ [CategoriesService] getMajorById(${id}):`, {
-        name: major.name,
-        subjectCount: major.subjects?.length || 0,
-      });
-    }
-
-    return major;
   }
 
-  // ✅ Lấy tất cả subjects
   async getAllSubjects() {
-    const subjects = await this.subjectModel.find().exec();
-    console.log(
-      `✅ [CategoriesService] getAllSubjects: ${subjects.length} subjects`,
-    );
-    return subjects;
+    return this.subjectModel.find().sort({ name: 1 }).exec();
   }
 }

@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
-import { UsersModule } from '../users/users.module';
-import { DocumentsModule } from '../documents/documents.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Document, DocumentSchema } from '../documents/schemas/document.schema';
@@ -13,8 +11,6 @@ import { StatisticsModule } from '../statistics/statistics.module';
 
 @Module({
   imports: [
-    UsersModule,
-    DocumentsModule,
     LogsModule,
     StatisticsModule,
     MongooseModule.forFeature([
