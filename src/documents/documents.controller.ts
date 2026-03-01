@@ -42,31 +42,13 @@ export class DocumentsController {
     @Body() uploadDocumentDto: UploadDocumentDto,
     @UploadedFile(
       new ParseFilePipe({
-        validators: [new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 })],
+        validators: [new MaxFileSizeValidator({ maxSize: 100 * 1024 * 1024 })],
       }),
     )
     file: Express.Multer.File,
   ) {
     const uploaderId = req.user.userId;
     return this.documentsService.create(uploadDocumentDto, file, uploaderId);
-  }
-
-  @UseGuards(AuthGuard('jwt'))
-  @Get(':id/download')
-  async downloadDocument(
-    @Param('id') docId: string,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const { streamableFile, doc } =
-      await this.documentsService.download(docId);
-    const originalFilename = doc.fileUrl.split('/').pop();
-
-    res.set({
-      'Content-Type': doc.fileType,
-      'Content-Disposition': `attachment; filename="${originalFilename}"`,
-    });
-
-    return streamableFile;
   }
 
   @Get()
@@ -103,6 +85,41 @@ export class DocumentsController {
     return this.documentsService.findUserDocuments(userId, queryDto);
   }
 
+  @UseGuards(AuthGuard('jwt'))
+  @Get(':id/download')
+  async downloadDocument(
+    @Param('id') docId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { streamableFile, doc } =
+      await this.documentsService.download(docId);
+    const originalFilename = doc.fileUrl.split('/').pop();
+
+    res.set({
+      'Content-Type': doc.fileType,
+      'Content-Disposition': `attachment; filename="${originalFilename}"`,
+    });
+
+    return streamableFile;
+  }
+
+  @Get(':id/preview')
+  async previewDocument(
+    @Param('id') docId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { streamableFile, doc } =
+      await this.documentsService.preview(docId);
+    const originalFilename = doc.fileUrl.split('/').pop();
+
+    res.set({
+      'Content-Type': doc.fileType,
+      'Content-Disposition': `inline; filename="${originalFilename}"`,
+    });
+
+    return streamableFile;
+  }
+
   @Get(':id')
   findOne(@Param('id') docId: string) {
     if (!Types.ObjectId.isValid(docId)) {
@@ -118,14 +135,21 @@ export class DocumentsController {
     @Body() updateDocumentDto: UpdateDocumentDto,
     @Request() req: AuthenticatedRequest,
   ) {
-    const userId = req.user.userId;
-    return this.documentsService.update(docId, updateDocumentDto, userId);
+    return this.documentsService.update(
+      docId,
+      updateDocumentDto,
+      req.user.userId,
+      req.user.role,
+    );
   }
 
   @UseGuards(AuthGuard('jwt'))
   @Delete(':id')
   remove(@Param('id') docId: string, @Request() req: AuthenticatedRequest) {
-    const userId = req.user.userId;
-    return this.documentsService.remove(docId, userId);
+    return this.documentsService.remove(
+      docId,
+      req.user.userId,
+      req.user.role,
+    );
   }
 }

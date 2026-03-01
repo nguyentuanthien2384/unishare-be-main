@@ -5,6 +5,7 @@ import {
   IsInt,
   Min,
   IsArray,
+  IsDateString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -25,6 +26,22 @@ export class GetDocumentsQueryDto {
   @IsOptional()
   @IsString()
   documentType?: string;
+
+  @IsOptional()
+  @IsString()
+  uploader?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fromDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  toDate?: string;
+
+  @IsOptional()
+  @IsString()
+  faculty?: string;
 
   @IsOptional()
   @IsIn(['uploadDate', 'downloadCount'])

@@ -20,6 +20,9 @@ export class Document extends mongoose.Document {
   @Prop({ required: true })
   fileUrl: string;
 
+  @Prop()
+  filePath: string;
+
   @Prop({ required: true })
   fileType: string;
 

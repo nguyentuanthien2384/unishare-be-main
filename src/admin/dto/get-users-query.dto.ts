@@ -8,8 +8,12 @@ export class GetUsersQueryDto {
   search?: string;
 
   @IsOptional()
-  @IsIn(['joinedDate', 'fullName', 'email'])
+  @IsIn(['joinedDate', 'fullName', 'email', 'downloadsCount', 'uploadsCount'])
   sortBy?: string = 'joinedDate';
+
+  @IsOptional()
+  @IsIn(['asc', 'desc'])
+  sortOrder?: string = 'desc';
 
   @IsOptional()
   @IsIn(Object.values(UserRole))

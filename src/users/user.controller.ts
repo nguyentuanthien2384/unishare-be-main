@@ -7,6 +7,8 @@ import {
   UseGuards,
   Request,
   Post,
+  Delete,
+  Query,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -44,6 +46,15 @@ export class UsersController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Delete('me/account')
+  deleteMyAccount(
+    @Request() req: AuthenticatedRequest,
+    @Body('password') password: string,
+  ) {
+    return this.usersService.deleteOwnAccount(req.user.userId, password);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Get('me/profile')
   getMyProfile(@Request() req: AuthenticatedRequest) {
     return this.usersService.findById(req.user.userId);
@@ -53,6 +64,22 @@ export class UsersController {
   @Get('me/stats')
   getMyStats(@Request() req: AuthenticatedRequest) {
     return this.usersService.getMyStats(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me/upload-stats')
+  getMyUploadStats(
+    @Request() req: AuthenticatedRequest,
+    @Query('period') period?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    return this.usersService.getMyUploadStats(
+      req.user.userId,
+      period,
+      fromDate,
+      toDate,
+    );
   }
 
   @Get('profile/:userId')

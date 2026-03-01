@@ -77,7 +77,7 @@ export class DocumentsService {
       doc.downloadCount += 1;
       await doc.save();
       await this.usersService.incrementTotalDownloads(
-        String(doc.uploader._id),
+        String(doc.uploader),
         1,
       );
       await this.statisticsService.incrementTotalDownloads(1);
@@ -91,6 +91,27 @@ export class DocumentsService {
     }
   }
 
+  async preview(
+    docId: string,
+  ): Promise<{ streamableFile: StreamableFile; doc: Document }> {
+    const doc = await this.documentModel.findById(docId);
+    if (!doc) {
+      throw new NotFoundException('Document not found');
+    }
+
+    const localFilePath = join(
+      process.cwd(),
+      (doc as unknown as Record<string, string>).filePath ||
+        doc.fileUrl.replace(/^https?:\/\/[^/]+\//, ''),
+    );
+    try {
+      const file = createReadStream(localFilePath);
+      return { streamableFile: new StreamableFile(file), doc };
+    } catch {
+      throw new NotFoundException('File not found on server storage.');
+    }
+  }
+
   async findAll(queryDto: GetDocumentsQueryDto) {
     const {
       page = 1,
@@ -99,6 +120,10 @@ export class DocumentsService {
       subject,
       subjects,
       documentType,
+      uploader,
+      fromDate,
+      toDate,
+      faculty,
       sortBy = 'uploadDate',
       sortOrder = 'desc',
     } = queryDto;
@@ -122,6 +147,35 @@ export class DocumentsService {
       query.documentType = documentType;
     }
 
+    if (uploader) {
+      query.uploader = new Types.ObjectId(uploader);
+    }
+
+    if (fromDate || toDate) {
+      const dateFilter: Record<string, Date> = {};
+      if (fromDate) dateFilter.$gte = new Date(fromDate);
+      if (toDate) {
+        const end = new Date(toDate);
+        end.setHours(23, 59, 59, 999);
+        dateFilter.$lte = end;
+      }
+      query.uploadDate = dateFilter;
+    }
+
+    if (faculty) {
+      const subjectsInFaculty = await this.documentModel.db
+        .collection('subjects')
+        .find({ managingFaculty: { $regex: faculty, $options: 'i' } })
+        .project({ _id: 1 })
+        .toArray();
+      const subjectIds = subjectsInFaculty.map((s) => s._id);
+      if (subjectIds.length > 0) {
+        query.subject = query.subject
+          ? { $in: subjectIds }
+          : { $in: subjectIds };
+      }
+    }
+
     const sortField =
       sortBy === 'downloads' ? 'downloadCount' : sortBy;
     const sortOrderValue = sortOrder === 'asc' ? 1 : -1;
@@ -135,7 +189,7 @@ export class DocumentsService {
       this.documentModel
         .find(query)
         .populate('uploader', 'fullName avatarUrl')
-        .populate('subject', 'name code')
+        .populate('subject', 'name code managingFaculty')
         .sort(sortOptions)
         .skip(skip)
         .limit(limit)
@@ -173,6 +227,7 @@ export class DocumentsService {
   private async getDocumentAndCheckOwnership(
     docId: string,
     userId: string,
+    userRole?: string,
   ): Promise<Document> {
     const doc = await this.documentModel.findById(docId);
 
@@ -180,7 +235,8 @@ export class DocumentsService {
       throw new NotFoundException('Document not found');
     }
 
-    if (String(doc.uploader._id) !== userId) {
+    const isAdmin = userRole === 'ADMIN' || userRole === 'MODERATOR';
+    if (!isAdmin && String(doc.uploader) !== userId) {
       throw new ForbiddenException(
         'You do not have permission to modify this document',
       );
@@ -193,8 +249,9 @@ export class DocumentsService {
     docId: string,
     updateDocumentDto: UpdateDocumentDto,
     userId: string,
+    userRole?: string,
   ): Promise<Document> {
-    await this.getDocumentAndCheckOwnership(docId, userId);
+    await this.getDocumentAndCheckOwnership(docId, userId, userRole);
 
     const updatedDoc = await this.documentModel
       .findByIdAndUpdate(docId, updateDocumentDto, { new: true })
@@ -208,8 +265,16 @@ export class DocumentsService {
     return updatedDoc;
   }
 
-  async remove(docId: string, userId: string): Promise<{ message: string }> {
-    const doc = await this.getDocumentAndCheckOwnership(docId, userId);
+  async remove(
+    docId: string,
+    userId: string,
+    userRole?: string,
+  ): Promise<{ message: string }> {
+    const doc = await this.getDocumentAndCheckOwnership(
+      docId,
+      userId,
+      userRole,
+    );
 
     await doc.deleteOne();
 

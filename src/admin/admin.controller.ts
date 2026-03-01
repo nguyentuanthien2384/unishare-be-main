@@ -61,20 +61,29 @@ export class AdminController {
 
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @Post('documents/:id/block')
-  blockDocument(@Param('id') docId: string) {
-    return this.adminService.blockDocument(docId);
+  blockDocument(
+    @Param('id') docId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.adminService.blockDocument(docId, req.user.userId);
   }
 
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @Post('documents/:id/unblock')
-  unblockDocument(@Param('id') docId: string) {
-    return this.adminService.unblockDocument(docId);
+  unblockDocument(
+    @Param('id') docId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.adminService.unblockDocument(docId, req.user.userId);
   }
 
   @Roles(UserRole.ADMIN)
   @Delete('users/:id')
-  deleteUser(@Param('id') userId: string) {
-    return this.adminService.deleteUser(userId);
+  deleteUser(
+    @Param('id') userId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.adminService.deleteUser(userId, req.user.userId);
   }
 
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
@@ -85,14 +94,30 @@ export class AdminController {
 
   @Roles(UserRole.ADMIN)
   @Delete('documents/:id')
-  deleteDocument(@Param('id') docId: string) {
-    return this.adminService.deleteDocument(docId);
+  deleteDocument(
+    @Param('id') docId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.adminService.deleteDocument(docId, req.user.userId);
   }
 
   @Roles(UserRole.ADMIN)
   @Patch('users/:id/role')
-  setUserRole(@Param('id') userId: string, @Body('role') role: UserRole) {
-    return this.adminService.setUserRole(userId, role);
+  setUserRole(
+    @Param('id') userId: string,
+    @Body('role') role: UserRole,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.adminService.setUserRole(userId, role, req.user.userId);
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Post('delegate-admin/:id')
+  delegateAdmin(
+    @Param('id') targetUserId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.adminService.delegateAdmin(targetUserId, req.user.userId);
   }
 
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)

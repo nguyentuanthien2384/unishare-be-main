@@ -26,9 +26,11 @@ import { randomBytes } from 'crypto';
             callback(null, `${randomName}${fileExtName}`);
           },
         }),
+        limits: { fileSize: 100 * 1024 * 1024 },
         fileFilter: (_req, file, callback) => {
           const allowedMimes = [
             'application/pdf',
+            'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'image/jpeg',
             'image/png',

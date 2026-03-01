@@ -159,30 +159,37 @@ describe('AdminService', () => {
 
   describe('deleteUser', () => {
     it('should delete a user and decrement active users', async () => {
-      const result = await service.deleteUser('userId123');
+      const result = await service.deleteUser('userId123', 'adminId');
 
       expect(userModel.findByIdAndDelete).toHaveBeenCalledWith('userId123');
       expect(statisticsService.incrementActiveUsers).toHaveBeenCalledWith(-1);
+      expect(logsService.createLog).toHaveBeenCalledWith('adminId', 'DELETE_USER', 'userId123');
       expect(result).toEqual({ message: 'User deleted successfully' });
     });
 
     it('should throw NotFoundException if user not found', async () => {
       userModel.findByIdAndDelete.mockResolvedValue(null);
 
-      await expect(service.deleteUser('nonexistent')).rejects.toThrow(
+      await expect(service.deleteUser('nonexistent', 'adminId')).rejects.toThrow(
         NotFoundException,
       );
     });
   });
 
   describe('setUserRole', () => {
-    it('should update user role', async () => {
-      await service.setUserRole('userId123', UserRole.MODERATOR);
+    it('should update user role and log the action', async () => {
+      await service.setUserRole('userId123', UserRole.MODERATOR, 'adminId');
 
       expect(userModel.findByIdAndUpdate).toHaveBeenCalledWith(
         'userId123',
         { role: UserRole.MODERATOR },
         { new: true },
+      );
+      expect(logsService.createLog).toHaveBeenCalledWith(
+        'adminId',
+        'CHANGE_ROLE',
+        'userId123',
+        expect.stringContaining('MODERATOR'),
       );
     });
 
@@ -190,7 +197,7 @@ describe('AdminService', () => {
       userModel.findByIdAndUpdate.mockResolvedValue(null);
 
       await expect(
-        service.setUserRole('nonexistent', UserRole.ADMIN),
+        service.setUserRole('nonexistent', UserRole.ADMIN, 'adminId'),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -263,9 +270,10 @@ describe('AdminService', () => {
   // --- Document Management ---
 
   describe('blockDocument', () => {
-    it('should block a document', async () => {
-      await service.blockDocument('docId123');
+    it('should block a document and log the action', async () => {
+      await service.blockDocument('docId123', 'adminId');
 
+      expect(logsService.createLog).toHaveBeenCalledWith('adminId', 'BLOCK_DOCUMENT', 'docId123');
       expect(documentModel.findByIdAndUpdate).toHaveBeenCalledWith(
         'docId123',
         { status: DocumentStatus.BLOCKED },
@@ -276,16 +284,17 @@ describe('AdminService', () => {
     it('should throw NotFoundException if document not found', async () => {
       documentModel.findByIdAndUpdate.mockResolvedValue(null);
 
-      await expect(service.blockDocument('nonexistent')).rejects.toThrow(
+      await expect(service.blockDocument('nonexistent', 'adminId')).rejects.toThrow(
         NotFoundException,
       );
     });
   });
 
   describe('unblockDocument', () => {
-    it('should unblock a document', async () => {
-      await service.unblockDocument('docId123');
+    it('should unblock a document and log the action', async () => {
+      await service.unblockDocument('docId123', 'adminId');
 
+      expect(logsService.createLog).toHaveBeenCalledWith('adminId', 'UNBLOCK_DOCUMENT', 'docId123');
       expect(documentModel.findByIdAndUpdate).toHaveBeenCalledWith(
         'docId123',
         { status: DocumentStatus.VISIBLE },
@@ -295,18 +304,19 @@ describe('AdminService', () => {
   });
 
   describe('deleteDocument', () => {
-    it('should delete a document and decrement uploads', async () => {
-      const result = await service.deleteDocument('docId123');
+    it('should delete a document, decrement uploads, and log', async () => {
+      const result = await service.deleteDocument('docId123', 'adminId');
 
       expect(documentModel.findByIdAndDelete).toHaveBeenCalledWith('docId123');
       expect(statisticsService.incrementTotalUploads).toHaveBeenCalledWith(-1);
+      expect(logsService.createLog).toHaveBeenCalledWith('adminId', 'DELETE_DOCUMENT', 'docId123');
       expect(result).toEqual({ message: 'Document deleted successfully' });
     });
 
     it('should throw NotFoundException if document not found', async () => {
       documentModel.findByIdAndDelete.mockResolvedValue(null);
 
-      await expect(service.deleteDocument('nonexistent')).rejects.toThrow(
+      await expect(service.deleteDocument('nonexistent', 'adminId')).rejects.toThrow(
         NotFoundException,
       );
     });

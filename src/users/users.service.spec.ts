@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
-import { getModelToken } from '@nestjs/mongoose';
+import { getModelToken, getConnectionToken } from '@nestjs/mongoose';
 import { User, UserRole, UserStatus } from './schemas/user.schema';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -40,10 +40,17 @@ describe('UsersService', () => {
     userModel.findByIdAndUpdate = jest.fn().mockReturnValue(mockQuery);
     userModel.updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
 
+    const mockConnection = {
+      collection: jest.fn().mockReturnValue({
+        aggregate: jest.fn().mockReturnValue({ toArray: jest.fn().mockResolvedValue([]) }),
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         { provide: getModelToken(User.name), useValue: userModel },
+        { provide: getConnectionToken(), useValue: mockConnection },
       ],
     }).compile();
 

@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -55,11 +57,13 @@ export class AdminService {
     return this.updateUserStatus(userId, UserStatus.ACTIVE);
   }
 
-  async blockDocument(docId: string): Promise<Document> {
+  async blockDocument(docId: string, actorId: string): Promise<Document> {
+    await this.logsService.createLog(actorId, 'BLOCK_DOCUMENT', docId);
     return this.updateDocumentStatus(docId, DocumentStatus.BLOCKED);
   }
 
-  async unblockDocument(docId: string): Promise<Document> {
+  async unblockDocument(docId: string, actorId: string): Promise<Document> {
+    await this.logsService.createLog(actorId, 'UNBLOCK_DOCUMENT', docId);
     return this.updateDocumentStatus(docId, DocumentStatus.VISIBLE);
   }
 
@@ -76,27 +80,30 @@ export class AdminService {
     return doc;
   }
 
-  async deleteUser(userId: string): Promise<{ message: string }> {
+  async deleteUser(userId: string, actorId: string): Promise<{ message: string }> {
     const user = await this.userModel.findByIdAndDelete(userId);
     if (!user) throw new NotFoundException('User not found');
     await this.statisticsService.incrementActiveUsers(-1);
+    await this.logsService.createLog(actorId, 'DELETE_USER', userId);
     return { message: 'User deleted successfully' };
   }
 
-  async deleteDocument(docId: string): Promise<{ message: string }> {
+  async deleteDocument(docId: string, actorId: string): Promise<{ message: string }> {
     const doc = await this.documentModel.findByIdAndDelete(docId);
     if (!doc) throw new NotFoundException('Document not found');
     await this.statisticsService.incrementTotalUploads(-1);
+    await this.logsService.createLog(actorId, 'DELETE_DOCUMENT', docId);
     return { message: 'Document deleted successfully' };
   }
 
-  async setUserRole(userId: string, role: UserRole): Promise<User> {
+  async setUserRole(userId: string, role: UserRole, actorId: string): Promise<User> {
     const user = await this.userModel.findByIdAndUpdate(
       userId,
       { role },
       { new: true },
     );
     if (!user) throw new NotFoundException('User not found');
+    await this.logsService.createLog(actorId, 'CHANGE_ROLE', userId, `Đổi role thành ${role}`);
     return user;
   }
 
@@ -106,6 +113,7 @@ export class AdminService {
       limit = 10,
       search,
       sortBy = 'joinedDate',
+      sortOrder = 'desc',
       role,
     } = queryDto;
 
@@ -121,7 +129,7 @@ export class AdminService {
     if (role) query.role = role;
 
     const sortOptions: Record<string, 1 | -1> = {};
-    sortOptions[sortBy] = sortBy === 'joinedDate' ? -1 : 1;
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
     const skip = (page - 1) * limit;
 
@@ -232,6 +240,43 @@ export class AdminService {
     const major = await this.majorModel.findByIdAndDelete(id);
     if (!major) throw new NotFoundException('Major not found');
     return { message: 'Major deleted successfully' };
+  }
+
+  async delegateAdmin(
+    targetUserId: string,
+    actorId: string,
+  ): Promise<User> {
+    if (targetUserId === actorId) {
+      throw new BadRequestException('Không thể ủy quyền cho chính mình');
+    }
+
+    const targetUser = await this.userModel.findById(targetUserId);
+    if (!targetUser) throw new NotFoundException('User not found');
+
+    if (targetUser.role !== UserRole.MODERATOR) {
+      throw new ForbiddenException(
+        'Chỉ có thể ủy quyền Admin cho Moderator',
+      );
+    }
+
+    await this.userModel.findByIdAndUpdate(actorId, {
+      role: UserRole.MODERATOR,
+    });
+
+    const newAdmin = await this.userModel.findByIdAndUpdate(
+      targetUserId,
+      { role: UserRole.ADMIN },
+      { new: true },
+    );
+
+    await this.logsService.createLog(
+      actorId,
+      'DELEGATE_ADMIN',
+      targetUserId,
+      `Ủy quyền Admin cho ${targetUser.fullName}`,
+    );
+
+    return newAdmin!;
   }
 
   async getDocumentsAdmin(queryDto: GetDocumentsQueryDto) {

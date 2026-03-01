@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import * as dotenv from 'dotenv';
+import * as fs from 'fs';
+import * as path from 'path';
 
 dotenv.config();
 
@@ -42,6 +44,7 @@ const DocumentSchema = new mongoose.Schema(
     title: { type: String, required: true },
     description: { type: String },
     fileUrl: { type: String, required: true },
+    filePath: { type: String },
     fileType: { type: String, required: true },
     fileSize: { type: Number, required: true },
     uploader: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -63,12 +66,13 @@ const PlatformStatsSchema = new mongoose.Schema({
 
 const LogSchema = new mongoose.Schema(
   {
-    actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     action: { type: String, required: true },
-    targetId: { type: String },
-    detail: { type: String },
+    targetUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    targetDocument: { type: mongoose.Schema.Types.ObjectId, ref: 'Document' },
+    details: { type: String },
   },
-  { timestamps: { createdAt: 'timestamp', updatedAt: false } },
+  { timestamps: { createdAt: 'createdAt', updatedAt: false } },
 );
 
 async function seed() {
@@ -164,14 +168,39 @@ async function seed() {
     { title: 'Công thức Xác suất thống kê', description: 'Tổng hợp công thức cần nhớ', subject: subjects[12]._id, uploader: sv4._id, documentType: 'Lecture Notes', schoolYear: '2024-2025', downloadCount: 78, viewCount: 190 },
   ];
 
-  const docs = await Doc.insertMany(
-    sampleDocs.map((d) => ({
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+  function createSamplePdf(title: string, description: string): { filePath: string; fileName: string; fileSize: number } {
+    const fileName = `seed-${Date.now()}-${String(Math.random()).slice(2, 8)}.pdf`;
+    const filePath = path.join(uploadsDir, fileName);
+    const content = [
+      '%PDF-1.4',
+      '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj',
+      '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+      '3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj',
+      '5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj',
+      `4 0 obj<</Length 44>>stream\nBT /F1 16 Tf 72 720 Td (${title}) Tj ET\nendstream\nendobj`,
+      'xref\n0 6',
+      'trailer<</Size 6/Root 1 0 R>>',
+      '%%EOF',
+    ].join('\n');
+    fs.writeFileSync(filePath, content);
+    return { filePath: `uploads/${fileName}`, fileName, fileSize: fs.statSync(filePath).size };
+  }
+
+  const docsToInsert = sampleDocs.map((d) => {
+    const pdf = createSamplePdf(d.title, d.description);
+    return {
       ...d,
-      fileUrl: `http://localhost:8000/uploads/sample-${String(Math.random()).slice(2, 10)}.pdf`,
+      fileUrl: `http://localhost:8000/${pdf.filePath.replace(/\\/g, '/')}`,
+      filePath: pdf.filePath,
       fileType: 'application/pdf',
-      fileSize: Math.floor(Math.random() * 5000000) + 500000,
-    })),
-  );
+      fileSize: pdf.fileSize,
+    };
+  });
+
+  const docs = await Doc.insertMany(docsToInsert);
 
   // Cập nhật uploadsCount
   const uploaderCounts: Record<string, number> = {};
@@ -194,8 +223,8 @@ async function seed() {
   // 6. LOGS
   console.log('=== Seeding Logs ===');
   await Log.insertMany([
-    { actor: admin._id, action: 'SYSTEM_SEED', detail: 'Seeded database' },
-    { actor: mod._id, action: 'REVIEW_DOCUMENT', targetId: String(docs[0]._id) },
+    { performedBy: admin._id, action: 'SYSTEM_SEED', details: 'Seeded database' },
+    { performedBy: mod._id, action: 'BLOCK_DOCUMENT', targetDocument: docs[0]._id },
   ]);
   console.log('  Created 2 logs\n');
 

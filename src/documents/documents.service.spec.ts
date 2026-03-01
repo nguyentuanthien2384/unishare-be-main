@@ -223,7 +223,7 @@ describe('DocumentsService', () => {
     it('should throw ForbiddenException if user is not the owner', async () => {
       const doc = {
         ...mockDocument,
-        uploader: { _id: 'differentUserId' },
+        uploader: 'differentUserId',
       };
       documentModel.findById.mockResolvedValue(doc);
 
@@ -245,7 +245,7 @@ describe('DocumentsService', () => {
     it('should throw ForbiddenException if user is not the owner', async () => {
       const doc = {
         ...mockDocument,
-        uploader: { _id: 'differentUserId' },
+        uploader: 'differentUserId',
       };
       documentModel.findById.mockResolvedValue(doc);
 
@@ -258,7 +258,7 @@ describe('DocumentsService', () => {
       const userId = '507f1f77bcf86cd799439011';
       const doc = {
         ...mockDocument,
-        uploader: { _id: userId },
+        uploader: userId,
         deleteOne: jest.fn().mockResolvedValue(true),
       };
       documentModel.findById.mockResolvedValue(doc);
