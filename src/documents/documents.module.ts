@@ -32,15 +32,16 @@ import { randomBytes } from 'crypto';
             'application/pdf',
             'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'image/jpeg',
-            'image/png',
-            'application/zip',
-            'application/x-zip-compressed',
           ];
           if (allowedMimes.includes(file.mimetype)) {
             callback(null, true);
           } else {
-            callback(new Error('Invalid file type.'), false);
+            callback(
+              new Error(
+                'Chỉ cho phép upload file .pdf, .doc hoặc .docx',
+              ),
+              false,
+            );
           }
         },
       }),

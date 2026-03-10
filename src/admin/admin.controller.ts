@@ -21,6 +21,8 @@ import { UpdateSubjectDto } from './dto/update-subject.dto';
 import { CreateMajorDto } from './dto/create-major.dto';
 import { UpdateMajorDto } from './dto/update-major.dto';
 import { GetDocumentsQueryDto } from '../documents/dto/get-documents-query.dto';
+import { GetLogsQueryDto } from '../logs/dto/get-logs-query.dto';
+import { LogsService } from '../logs/logs.service';
 import { Request as ExpressRequest } from 'express';
 
 interface AuthenticatedRequest extends ExpressRequest {
@@ -30,7 +32,10 @@ interface AuthenticatedRequest extends ExpressRequest {
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly logsService: LogsService,
+  ) {}
 
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @Post('users/:id/reset-password')
@@ -126,10 +131,19 @@ export class AdminController {
     return this.adminService.getUsers(queryDto);
   }
 
+  @Roles(UserRole.ADMIN)
+  @Get('logs')
+  getLogs(@Query() queryDto: GetLogsQueryDto) {
+    return this.logsService.findAll(queryDto);
+  }
+
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @Post('subjects')
-  createSubject(@Body() createSubjectDto: CreateSubjectDto) {
-    return this.adminService.createSubject(createSubjectDto);
+  createSubject(
+    @Body() createSubjectDto: CreateSubjectDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.adminService.createSubject(createSubjectDto, req.user.userId);
   }
 
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
@@ -143,20 +157,27 @@ export class AdminController {
   updateSubject(
     @Param('id') id: string,
     @Body() updateSubjectDto: UpdateSubjectDto,
+    @Request() req: AuthenticatedRequest,
   ) {
-    return this.adminService.updateSubject(id, updateSubjectDto);
+    return this.adminService.updateSubject(id, updateSubjectDto, req.user.userId);
   }
 
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @Delete('subjects/:id')
-  removeSubject(@Param('id') id: string) {
-    return this.adminService.removeSubject(id);
+  removeSubject(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.adminService.removeSubject(id, req.user.userId);
   }
 
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @Post('majors')
-  createMajor(@Body() createMajorDto: CreateMajorDto) {
-    return this.adminService.createMajor(createMajorDto);
+  createMajor(
+    @Body() createMajorDto: CreateMajorDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.adminService.createMajor(createMajorDto, req.user.userId);
   }
 
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
@@ -170,13 +191,17 @@ export class AdminController {
   updateMajor(
     @Param('id') id: string,
     @Body() updateMajorDto: UpdateMajorDto,
+    @Request() req: AuthenticatedRequest,
   ) {
-    return this.adminService.updateMajor(id, updateMajorDto);
+    return this.adminService.updateMajor(id, updateMajorDto, req.user.userId);
   }
 
   @Roles(UserRole.ADMIN, UserRole.MODERATOR)
   @Delete('majors/:id')
-  removeMajor(@Param('id') id: string) {
-    return this.adminService.removeMajor(id);
+  removeMajor(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.adminService.removeMajor(id, req.user.userId);
   }
 }

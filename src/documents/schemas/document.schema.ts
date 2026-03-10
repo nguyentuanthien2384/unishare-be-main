@@ -52,6 +52,9 @@ export class Document extends mongoose.Document {
   @Prop()
   schoolYear: string;
 
+  @Prop()
+  thumbnailUrl: string;
+
   @Prop({ default: 0 })
   downloadCount: number;
 

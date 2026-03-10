@@ -86,13 +86,23 @@ export class DocumentsController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Post('generate-thumbnails')
+  generateThumbnails(@Request() req: AuthenticatedRequest) {
+    if (req.user.role !== 'ADMIN') {
+      throw new BadRequestException('Only admins can trigger this action');
+    }
+    return this.documentsService.generateMissingThumbnails();
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Get(':id/download')
   async downloadDocument(
     @Param('id') docId: string,
     @Res({ passthrough: true }) res: Response,
+    @Request() req: AuthenticatedRequest,
   ) {
     const { streamableFile, doc } =
-      await this.documentsService.download(docId);
+      await this.documentsService.download(docId, req.user.userId);
     const originalFilename = doc.fileUrl.split('/').pop();
 
     res.set({

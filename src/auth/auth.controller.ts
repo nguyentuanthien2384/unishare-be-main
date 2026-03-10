@@ -7,6 +7,7 @@ import {
   UseGuards,
   Get,
   Request,
+  Headers,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -31,6 +32,23 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  logout(
+    @Headers('authorization') authHeader: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const token = authHeader?.replace('Bearer ', '');
+    return this.authService.logout(token, req.user.userId);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  forgotPassword(@Body('email') email: string) {
+    return this.authService.forgotPassword(email);
   }
 
   @UseGuards(AuthGuard('jwt'))

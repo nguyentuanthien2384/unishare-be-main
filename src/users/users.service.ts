@@ -8,16 +8,20 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Connection } from 'mongoose';
 import { InjectConnection } from '@nestjs/mongoose';
 import { User, UserRole } from './schemas/user.schema';
+import { Document } from '../documents/schemas/document.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { LogsService } from '../logs/logs.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(Document.name) private documentModel: Model<Document>,
     @InjectConnection() private connection: Connection,
+    private logsService: LogsService,
   ) {}
 
   async findOneByEmail(email: string): Promise<User | null> {
@@ -48,6 +52,10 @@ export class UsersService {
     if (!updatedUser) {
       throw new NotFoundException('User not found');
     }
+
+    const changedFields = Object.keys(updateProfileDto).join(', ');
+    await this.logsService.createLog(userId, 'UPDATE_PROFILE', userId, `Cập nhật thông tin cá nhân: ${changedFields}`);
+
     return updatedUser;
   }
 
@@ -70,6 +78,8 @@ export class UsersService {
 
     user.password = await bcrypt.hash(changePasswordDto.newPassword, 10);
     await user.save();
+
+    await this.logsService.createLog(userId, 'CHANGE_PASSWORD', userId, `Đổi mật khẩu thành công`);
 
     return this.userModel
       .findById(userId)
@@ -109,8 +119,10 @@ export class UsersService {
       throw new UnauthorizedException('Mật khẩu không chính xác');
     }
 
+    await this.documentModel.deleteMany({ uploader: userId });
+    await this.logsService.createLog(userId, 'DELETE_OWN_ACCOUNT', userId, `Xóa tài khoản ${user.fullName} (${user.email}) và toàn bộ tài liệu`);
     await this.userModel.findByIdAndDelete(userId);
-    return { message: 'Tài khoản đã được xóa thành công' };
+    return { message: 'Tài khoản và toàn bộ tài liệu đã được xóa thành công' };
   }
 
   async getMyStats(userId: string) {

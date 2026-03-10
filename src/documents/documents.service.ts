@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   StreamableFile,
 } from '@nestjs/common';
@@ -9,7 +10,7 @@ import { Model, Types } from 'mongoose';
 import { Document } from './schemas/document.schema';
 import { UploadDocumentDto } from './dto/upload-document.dto';
 import { UsersService } from '../users/users.service';
-import { createReadStream } from 'fs';
+import { createReadStream, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { GetDocumentsQueryDto } from './dto/get-documents-query.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
@@ -19,13 +20,50 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name);
+  private readonly thumbnailRelDir = join('uploads', 'thumbnails');
+  private readonly thumbnailDir = join(process.cwd(), 'uploads', 'thumbnails');
+
   constructor(
     @InjectModel(Document.name) private documentModel: Model<Document>,
     private usersService: UsersService,
     private statisticsService: StatisticsService,
     private configService: ConfigService,
     private logsService: LogsService,
-  ) {}
+  ) {
+    if (!existsSync(this.thumbnailDir)) {
+      mkdirSync(this.thumbnailDir, { recursive: true });
+    }
+  }
+
+  private async generateThumbnail(
+    filePath: string,
+    fileName: string,
+  ): Promise<string | null> {
+    try {
+      const { pdfToPng } = await (Function(
+        'return import("pdf-to-png-converter")',
+      )() as Promise<typeof import('pdf-to-png-converter')>);
+
+      const absolutePath = join(process.cwd(), filePath);
+      const pngFileName = `${fileName}.png`;
+      const pages = await pdfToPng(absolutePath, {
+        viewportScale: 1.5,
+        pagesToProcess: [1],
+        outputFolder: this.thumbnailRelDir,
+        outputFileMaskFunc: () => pngFileName,
+      });
+
+      if (pages.length > 0 && pages[0].path) {
+        const baseUrl = this.configService.get<string>('API_URL');
+        return `${baseUrl}/uploads/thumbnails/${pngFileName}`;
+      }
+      return null;
+    } catch (error) {
+      this.logger.warn(`Failed to generate thumbnail: ${error}`);
+      return null;
+    }
+  }
 
   async create(
     uploadDocumentDto: UploadDocumentDto,
@@ -36,6 +74,12 @@ export class DocumentsService {
     const relativePath = file.path;
     const fullFileUrl = `${baseUrl}/${relativePath.replace(/\\/g, '/')}`;
 
+    let thumbnailUrl: string | null = null;
+    if (file.mimetype === 'application/pdf') {
+      const thumbName = file.filename.replace(/\.[^.]+$/, '');
+      thumbnailUrl = await this.generateThumbnail(file.path, thumbName);
+    }
+
     const documentData = new this.documentModel({
       ...uploadDocumentDto,
       fileUrl: fullFileUrl,
@@ -43,6 +87,7 @@ export class DocumentsService {
       fileType: file.mimetype,
       fileSize: file.size,
       uploader: uploaderId,
+      ...(thumbnailUrl && { thumbnailUrl }),
     });
 
     const savedDocument = await documentData.save();
@@ -54,12 +99,14 @@ export class DocumentsService {
 
     await this.usersService.incrementUploadCount(uploaderId, 1);
     await this.statisticsService.incrementTotalUploads(1);
+    await this.logsService.createLog(uploaderId, 'UPLOAD_DOCUMENT', String(savedDocument._id), `Upload tài liệu "${savedDocument.title}"`);
 
     return savedDocument;
   }
 
   async download(
     docId: string,
+    userId?: string,
   ): Promise<{ streamableFile: StreamableFile; doc: Document }> {
     const doc = await this.documentModel.findById(docId);
     if (!doc) {
@@ -81,6 +128,10 @@ export class DocumentsService {
         1,
       );
       await this.statisticsService.incrementTotalDownloads(1);
+
+      if (userId) {
+        await this.logsService.createLog(userId, 'DOWNLOAD_DOCUMENT', docId, `Tải tài liệu "${doc.title}"`);
+      }
 
       return {
         streamableFile: new StreamableFile(file),
@@ -251,7 +302,8 @@ export class DocumentsService {
     userId: string,
     userRole?: string,
   ): Promise<Document> {
-    await this.getDocumentAndCheckOwnership(docId, userId, userRole);
+    const oldDoc = await this.getDocumentAndCheckOwnership(docId, userId, userRole);
+    const oldTitle = oldDoc.title;
 
     const updatedDoc = await this.documentModel
       .findByIdAndUpdate(docId, updateDocumentDto, { new: true })
@@ -261,6 +313,8 @@ export class DocumentsService {
     if (!updatedDoc) {
       throw new NotFoundException('Document not found');
     }
+
+    await this.logsService.createLog(userId, 'UPDATE_DOCUMENT', docId, `Cập nhật tài liệu "${oldTitle}" → "${updatedDoc.title}"`);
 
     return updatedDoc;
   }
@@ -276,11 +330,12 @@ export class DocumentsService {
       userRole,
     );
 
+    const docTitle = doc.title;
     await doc.deleteOne();
 
     await this.usersService.incrementUploadCount(userId, -1);
     await this.statisticsService.incrementTotalUploads(-1);
-    await this.logsService.createLog(userId, 'DELETE_OWN_DOCUMENT', docId);
+    await this.logsService.createLog(userId, 'DELETE_OWN_DOCUMENT', docId, `Xóa tài liệu "${docTitle}"`);
 
     return { message: 'Document deleted successfully' };
   }
@@ -375,5 +430,40 @@ export class DocumentsService {
         totalPages: Math.ceil(totalDocuments / limit),
       },
     };
+  }
+
+  async generateMissingThumbnails(): Promise<{ processed: number; success: number; failed: number }> {
+    const docs = await this.documentModel.find({
+      $or: [
+        { thumbnailUrl: { $exists: false } },
+        { thumbnailUrl: null },
+        { thumbnailUrl: '' },
+      ],
+      fileType: 'application/pdf',
+    } as any);
+
+    let success = 0;
+    let failed = 0;
+
+    for (const doc of docs) {
+      const filePath = (doc as unknown as Record<string, string>).filePath;
+      if (!filePath) {
+        failed++;
+        continue;
+      }
+
+      const fileName = filePath.replace(/^.*[/\\]/, '').replace(/\.[^.]+$/, '');
+      const thumbnailUrl = await this.generateThumbnail(filePath, fileName);
+
+      if (thumbnailUrl) {
+        doc.thumbnailUrl = thumbnailUrl;
+        await doc.save();
+        success++;
+      } else {
+        failed++;
+      }
+    }
+
+    return { processed: docs.length, success, failed };
   }
 }

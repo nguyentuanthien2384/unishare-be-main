@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, PipelineStage } from 'mongoose';
 import { Document, DocumentStatus } from '../documents/schemas/document.schema';
 import { User, UserRole, UserStatus } from '../users/schemas/user.schema';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
@@ -46,25 +46,39 @@ export class AdminService {
   }
 
   async blockUser(userId: string, actorId: string): Promise<User> {
-    await this.logsService.createLog(actorId, 'BLOCK_USER', userId);
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
     await this.statisticsService.incrementActiveUsers(-1);
-    return this.updateUserStatus(userId, UserStatus.BLOCKED);
+    const result = await this.updateUserStatus(userId, UserStatus.BLOCKED);
+    await this.logsService.createLog(actorId, 'BLOCK_USER', userId, `Block user ${user.fullName} (${user.email})`);
+    return result;
   }
 
   async unblockUser(userId: string, actorId: string): Promise<User> {
-    await this.logsService.createLog(actorId, 'UNBLOCK_USER', userId);
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
     await this.statisticsService.incrementActiveUsers(1);
-    return this.updateUserStatus(userId, UserStatus.ACTIVE);
+    const result = await this.updateUserStatus(userId, UserStatus.ACTIVE);
+    await this.logsService.createLog(actorId, 'UNBLOCK_USER', userId, `Bỏ block user ${user.fullName} (${user.email})`);
+    return result;
   }
 
   async blockDocument(docId: string, actorId: string): Promise<Document> {
-    await this.logsService.createLog(actorId, 'BLOCK_DOCUMENT', docId);
-    return this.updateDocumentStatus(docId, DocumentStatus.BLOCKED);
+    const doc = await this.documentModel.findById(docId).populate('uploader', 'fullName email');
+    if (!doc) throw new NotFoundException('Document not found');
+    const uploaderInfo = doc.uploader as unknown as { fullName: string; email: string };
+    const result = await this.updateDocumentStatus(docId, DocumentStatus.BLOCKED);
+    await this.logsService.createLog(actorId, 'BLOCK_DOCUMENT', docId, `Block tài liệu "${doc.title}" của ${uploaderInfo?.fullName || 'N/A'}`);
+    return result;
   }
 
   async unblockDocument(docId: string, actorId: string): Promise<Document> {
-    await this.logsService.createLog(actorId, 'UNBLOCK_DOCUMENT', docId);
-    return this.updateDocumentStatus(docId, DocumentStatus.VISIBLE);
+    const doc = await this.documentModel.findById(docId).populate('uploader', 'fullName email');
+    if (!doc) throw new NotFoundException('Document not found');
+    const uploaderInfo = doc.uploader as unknown as { fullName: string; email: string };
+    const result = await this.updateDocumentStatus(docId, DocumentStatus.VISIBLE);
+    await this.logsService.createLog(actorId, 'UNBLOCK_DOCUMENT', docId, `Bỏ block tài liệu "${doc.title}" của ${uploaderInfo?.fullName || 'N/A'}`);
+    return result;
   }
 
   private async updateDocumentStatus(
@@ -83,27 +97,47 @@ export class AdminService {
   async deleteUser(userId: string, actorId: string): Promise<{ message: string }> {
     const user = await this.userModel.findByIdAndDelete(userId);
     if (!user) throw new NotFoundException('User not found');
+    const deletedDocs = await this.documentModel.deleteMany({ uploader: userId });
     await this.statisticsService.incrementActiveUsers(-1);
-    await this.logsService.createLog(actorId, 'DELETE_USER', userId);
-    return { message: 'User deleted successfully' };
+    await this.statisticsService.incrementTotalUploads(-deletedDocs.deletedCount);
+    await this.logsService.createLog(actorId, 'DELETE_USER', userId, `Xóa user ${user.email} và ${deletedDocs.deletedCount} tài liệu`);
+    return { message: 'User và toàn bộ tài liệu đã được xóa thành công' };
   }
 
   async deleteDocument(docId: string, actorId: string): Promise<{ message: string }> {
-    const doc = await this.documentModel.findByIdAndDelete(docId);
+    const doc = await this.documentModel.findById(docId).populate('uploader', 'fullName email');
     if (!doc) throw new NotFoundException('Document not found');
+    const uploaderInfo = doc.uploader as unknown as { fullName: string; email: string };
+    const title = doc.title;
+    await doc.deleteOne();
     await this.statisticsService.incrementTotalUploads(-1);
-    await this.logsService.createLog(actorId, 'DELETE_DOCUMENT', docId);
+    await this.logsService.createLog(actorId, 'DELETE_DOCUMENT', docId, `Xóa tài liệu "${title}" của ${uploaderInfo?.fullName || 'N/A'}`);
     return { message: 'Document deleted successfully' };
   }
 
   async setUserRole(userId: string, role: UserRole, actorId: string): Promise<User> {
-    const user = await this.userModel.findByIdAndUpdate(
-      userId,
-      { role },
-      { new: true },
-    );
+    const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');
-    await this.logsService.createLog(actorId, 'CHANGE_ROLE', userId, `Đổi role thành ${role}`);
+
+    const oldRole = user.role;
+    let action: string;
+    let detail: string;
+
+    if (oldRole === UserRole.USER && role === UserRole.MODERATOR) {
+      action = 'PROMOTE_USER';
+      detail = `Thăng cấp ${user.fullName} (${user.email}) từ USER lên MODERATOR`;
+    } else if (oldRole === UserRole.MODERATOR && role === UserRole.USER) {
+      action = 'DEMOTE_MODERATOR';
+      detail = `Giáng cấp ${user.fullName} (${user.email}) từ MODERATOR xuống USER`;
+    } else {
+      action = 'CHANGE_ROLE';
+      detail = `Đổi role ${user.fullName} (${user.email}) từ ${oldRole} thành ${role}`;
+    }
+
+    user.role = role;
+    await user.save();
+
+    await this.logsService.createLog(actorId, action, userId, detail);
     return user;
   }
 
@@ -117,6 +151,60 @@ export class AdminService {
       role,
     } = queryDto;
 
+    const skip = (page - 1) * limit;
+    const sortValue: 1 | -1 = sortOrder === 'asc' ? 1 : -1;
+
+    if (sortBy === 'totalDocDownloads') {
+      const matchStage: Record<string, unknown> = {};
+      if (search) {
+        matchStage.$or = [
+          { fullName: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } },
+        ];
+      }
+      if (role) matchStage.role = role;
+
+      const pipeline: PipelineStage[] = [
+        { $match: matchStage },
+        {
+          $lookup: {
+            from: 'documents',
+            localField: '_id',
+            foreignField: 'uploader',
+            as: 'userDocuments',
+          },
+        },
+        {
+          $addFields: {
+            totalDocDownloads: { $sum: '$userDocuments.downloadCount' },
+          },
+        },
+        { $project: { password: 0, userDocuments: 0 } },
+        { $sort: { totalDocDownloads: sortValue } },
+        {
+          $facet: {
+            data: [{ $skip: skip }, { $limit: limit }],
+            total: [{ $count: 'count' }],
+          },
+        },
+      ];
+
+      const [result] = await this.userModel.aggregate(pipeline).exec();
+      const users = result.data || [];
+      const totalUsers =
+        result.total && result.total.length > 0 ? result.total[0].count : 0;
+
+      return {
+        data: users,
+        pagination: {
+          total: totalUsers,
+          page,
+          limit,
+          totalPages: Math.ceil(totalUsers / limit),
+        },
+      };
+    }
+
     const query: Record<string, unknown> = {};
 
     if (search) {
@@ -128,10 +216,11 @@ export class AdminService {
 
     if (role) query.role = role;
 
-    const sortOptions: Record<string, 1 | -1> = {};
-    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
-
-    const skip = (page - 1) * limit;
+    const sortField =
+      sortBy === 'downloads' ? 'downloadsCount' : sortBy;
+    const sortOptions: Record<string, 1 | -1> = {
+      [sortField]: sortValue,
+    };
 
     const [users, totalUsers] = await Promise.all([
       this.userModel
@@ -162,13 +251,14 @@ export class AdminService {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');
 
-    const newPassword = '123456';
+    const { randomBytes } = await import('crypto');
+    const newPassword = randomBytes(4).toString('hex');
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     user.password = hashedPassword;
     await user.save();
 
-    await this.logsService.createLog(actorId, 'RESET_PASSWORD', userId);
+    await this.logsService.createLog(actorId, 'RESET_PASSWORD', userId, `Reset mật khẩu cho ${user.email}`);
 
     return {
       message: `Đã reset mật khẩu cho ${user.email} thành công.`,
@@ -176,7 +266,7 @@ export class AdminService {
     };
   }
 
-  async createSubject(createSubjectDto: CreateSubjectDto) {
+  async createSubject(createSubjectDto: CreateSubjectDto, actorId?: string) {
     const existing = await this.subjectModel.findOne({
       $or: [{ code: createSubjectDto.code }, { name: createSubjectDto.name }],
     });
@@ -184,30 +274,43 @@ export class AdminService {
       throw new ConflictException('Subject code or name already exists');
     }
     const newSubject = new this.subjectModel(createSubjectDto);
-    return newSubject.save();
+    const saved = await newSubject.save();
+    if (actorId) {
+      await this.logsService.createLog(actorId, 'CREATE_SUBJECT', String(saved._id), `Tạo môn học "${saved.name}" (${saved.code})`);
+    }
+    return saved;
   }
 
   async findAllSubjects() {
     return this.subjectModel.find().sort({ name: 1 }).exec();
   }
 
-  async updateSubject(id: string, updateSubjectDto: UpdateSubjectDto) {
+  async updateSubject(id: string, updateSubjectDto: UpdateSubjectDto, actorId?: string) {
+    const oldSubject = await this.subjectModel.findById(id);
+    if (!oldSubject) throw new NotFoundException('Subject not found');
+    const oldName = oldSubject.name;
     const subject = await this.subjectModel.findByIdAndUpdate(
       id,
       updateSubjectDto,
       { new: true },
     );
     if (!subject) throw new NotFoundException('Subject not found');
+    if (actorId) {
+      await this.logsService.createLog(actorId, 'UPDATE_SUBJECT', id, `Cập nhật môn học "${oldName}" → "${subject.name}" (${subject.code})`);
+    }
     return subject;
   }
 
-  async removeSubject(id: string) {
+  async removeSubject(id: string, actorId?: string) {
     const subject = await this.subjectModel.findByIdAndDelete(id);
     if (!subject) throw new NotFoundException('Subject not found');
+    if (actorId) {
+      await this.logsService.createLog(actorId, 'DELETE_SUBJECT', id, `Xóa môn học "${subject.name}" (${subject.code})`);
+    }
     return { message: 'Subject deleted successfully' };
   }
 
-  async createMajor(createMajorDto: CreateMajorDto) {
+  async createMajor(createMajorDto: CreateMajorDto, actorId?: string) {
     const existing = await this.majorModel.findOne({
       name: createMajorDto.name,
     });
@@ -215,7 +318,11 @@ export class AdminService {
       throw new ConflictException('Major name already exists');
     }
     const newMajor = new this.majorModel(createMajorDto);
-    return newMajor.save();
+    const saved = await newMajor.save();
+    if (actorId) {
+      await this.logsService.createLog(actorId, 'CREATE_MAJOR', String(saved._id), `Tạo ngành học "${saved.name}"`);
+    }
+    return saved;
   }
 
   async findAllMajors() {
@@ -226,19 +333,28 @@ export class AdminService {
       .exec();
   }
 
-  async updateMajor(id: string, updateMajorDto: UpdateMajorDto) {
+  async updateMajor(id: string, updateMajorDto: UpdateMajorDto, actorId?: string) {
+    const oldMajor = await this.majorModel.findById(id);
+    if (!oldMajor) throw new NotFoundException('Major not found');
+    const oldName = oldMajor.name;
     const major = await this.majorModel.findByIdAndUpdate(
       id,
       updateMajorDto,
       { new: true },
     );
     if (!major) throw new NotFoundException('Major not found');
+    if (actorId) {
+      await this.logsService.createLog(actorId, 'UPDATE_MAJOR', id, `Cập nhật ngành học "${oldName}" → "${major.name}"`);
+    }
     return major;
   }
 
-  async removeMajor(id: string) {
+  async removeMajor(id: string, actorId?: string) {
     const major = await this.majorModel.findByIdAndDelete(id);
     if (!major) throw new NotFoundException('Major not found');
+    if (actorId) {
+      await this.logsService.createLog(actorId, 'DELETE_MAJOR', id, `Xóa ngành học "${major.name}"`);
+    }
     return { message: 'Major deleted successfully' };
   }
 
